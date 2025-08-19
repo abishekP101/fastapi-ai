@@ -2,7 +2,6 @@
 """
 Simple test script for the Sikkim Travel Itinerary API v2.0 (LangChain Agent)
 """
-
 import json
 import requests
 import time
@@ -64,8 +63,8 @@ def test_agent_endpoint(base_url="http://localhost:8000"):
 def test_itinerary_endpoint(base_url="http://localhost:8000"):
     """Test the itinerary generation endpoint"""
     test_data = {
-        "preference": "culture",
-        "days": 3
+        "preference": "adventure",
+        "days": 5
     }
     
     try:

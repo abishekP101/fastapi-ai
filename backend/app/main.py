@@ -1,8 +1,13 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from typing import List, Dict
+import requests
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from .models import ItineraryRequest, TravelState
 from .agent import get_travel_agent
 from .configs import GROQ_API_KEY, TAVILY_API_KEY
+from .graph import run_graph
 import json
 import logging
 
@@ -15,6 +20,11 @@ app = FastAPI(
     description="AI-powered travel itinerary generator for Sikkim using LangChain Agent",
     version="2.0.0"
 )
+
+# Serve frontend at /ui (LangGraph UI)
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(static_dir):
+    app.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
 
 # Add CORS middleware
 app.add_middleware(
@@ -137,3 +147,16 @@ async def test_agent():
     except Exception as e:
         logger.error(f"Agent test failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Agent test failed: {str(e)}")
+
+@app.post("/graph/generate")
+def graph_generate(req: ItineraryRequest):
+    """Run LangGraph pipeline: itinerary -> accommodations -> combined JSON"""
+    try:
+        if not TAVILY_API_KEY:
+            raise HTTPException(status_code=500, detail="Tavily API key not configured")
+        return run_graph(req.preference, req.days)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Graph generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Graph generation failed: {str(e)}")

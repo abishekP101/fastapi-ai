@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sikkim LangGraph Planner</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <h1>🗺️ Sikkim LangGraph Planner</h1>
+            <p class="subtitle">Generates itinerary, fetches nearby stays, and visualizes on a map.</p>
+        </header>
+
+        <section class="form-section">
+            <form id="graph-form" class="form" autocomplete="off">
+                <label>
+                    Preference
+                    <input type="text" id="preference" name="preference" placeholder="adventure, culture, nature" value="adventure" required />
+                </label>
+                <label>
+                    Days
+                    <input type="number" id="days" name="days" min="1" max="30" value="3" required />
+                </label>
+                <button type="submit">Run Graph</button>
+            </form>
+            <div id="message" class="message" role="status"></div>
+        </section>
+
+        <section class="results" id="results" hidden>
+            <h2>Itinerary</h2>
+            <div id="itinerary-container" class="itinerary"></div>
+        </section>
+
+        <section class="accommodations-section">
+            <h2>Map</h2>
+            <div id="map"></div>
+            <div id="acc-list" class="acc-list"></div>
+        </section>
+
+        <footer class="footer">
+            <a href="/docs" target="_blank" rel="noopener">Open API Docs</a>
+            <span>•</span>
+            <a href="/ui" rel="noopener">Reload UI</a>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js"></script>
+    </body>
+    </html>
+
+
+
