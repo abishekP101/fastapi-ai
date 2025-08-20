@@ -8,8 +8,7 @@
   const itineraryContainer = $('#itinerary-container');
   const accList = document.getElementById('acc-list');
 
-  let map, markersLayer;
-  initMap();
+  // Map removed
 
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -20,38 +19,27 @@
       return;
     }
     setMessage('Running graph…', 'loading');
-    resultsSection.hidden = true;
-    itineraryContainer.innerHTML = '';
-    accList.innerHTML = '';
-    clearMarkers();
+  resultsSection.hidden = true;
+  itineraryContainer.innerHTML = '';
+  accList.innerHTML = '';
 
     try {
-      const data = await fetchJson('/graph/generate', {
+  const data = await fetchJson('/generate-full-itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preference, days })
       });
-      if (!data.success) throw new Error('Graph generation failed');
+  if (!data.success) throw new Error('Itinerary generation failed');
 
-      // Render itinerary cards
-      const items = Array.isArray(data.combined) && data.combined.length ? data.combined : data.itinerary || [];
-      itineraryContainer.innerHTML = items.map(card).join('');
-      resultsSection.hidden = false;
+  // Render itinerary cards
+  const items = Array.isArray(data.itinerary) ? data.itinerary : [];
+  itineraryContainer.innerHTML = items.map(card).join('');
+  resultsSection.hidden = false;
 
-      // Render accommodations list and markers
-      const accByLocation = data.accommodations || {};
-      const markers = [];
-      for (const day of items) {
-        const location = day.location || '';
-        const accs = accByLocation[location] || [];
-        accs.forEach((i) => {
-          const m = addMarker(i);
-          if (m) markers.push(m);
-        });
-      }
-      accList.innerHTML = renderAccList(accByLocation);
-      fitToMarkers();
-      setMessage('Done.', 'success');
+  // Render hotels/homestays list only
+  const hotelsByLocation = data.hotels || {};
+  accList.innerHTML = renderAccList(hotelsByLocation);
+  setMessage('Done.', 'success');
     } catch (e) {
       setMessage(`Error: ${e.message}`, 'error');
     }
@@ -82,8 +70,7 @@
       const items = (arr || []).map((i) => {
         const safeName = escapeHtml(i.name || 'Accommodation');
         const url = i.url ? `<a href="${i.url}" target="_blank" rel="noopener">Link</a>` : '';
-        const pos = i.lat != null && i.lon != null ? `(${i.lat.toFixed(4)}, ${i.lon.toFixed(4)})` : '';
-        return `<div class="acc-item">${safeName} ${pos} ${url}</div>`;
+        return `<div class="acc-item">${safeName} ${url}</div>`;
       }).join('');
       return `<div class="acc-group"><h3>${escapeHtml(loc)}</h3>${items}</div>`;
     });
@@ -110,40 +97,7 @@
     }
   }
 
-  function initMap() {
-    const mapEl = document.getElementById('map');
-    if (!mapEl || !window.L) return;
-    map = L.map('map').setView([27.3314, 88.6138], 8);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-    markersLayer = L.layerGroup().addTo(map);
-  }
-
-  function clearMarkers() {
-    if (markersLayer) markersLayer.clearLayers();
-  }
-
-  function addMarker(item) {
-    if (!map || item.lat == null || item.lon == null) return null;
-    const m = L.marker([item.lat, item.lon]).addTo(markersLayer);
-    const safeName = escapeHtml(item.name || 'Accommodation');
-    const link = item.url ? `<a href="${item.url}" target="_blank" rel="noopener">Open</a>` : '';
-    m.bindPopup(`<strong>${safeName}</strong><br/>${link}`);
-    return m;
-  }
-
-  function fitToMarkers() {
-    const bounds = [];
-    markersLayer.eachLayer((layer) => {
-      if (layer.getLatLng) {
-        const ll = layer.getLatLng();
-        bounds.push([ll.lat, ll.lng]);
-      }
-    });
-    if (bounds.length) map.fitBounds(bounds, { padding: [20, 20] });
-  }
+  // Map-related functions removed
 
   function escapeHtml(str) {
     return String(str)

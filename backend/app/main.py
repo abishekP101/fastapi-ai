@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .models import ItineraryRequest, TravelState
 from .agent import get_travel_agent
 from .configs import GROQ_API_KEY, TAVILY_API_KEY
-from .graph import run_graph
+    # LangGraph removed. Only LangChain agent is used.
 import json
 import logging
 
@@ -21,7 +21,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Serve frontend at /ui (LangGraph UI)
+# Serve frontend at /ui
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.isdir(static_dir):
     app.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
@@ -148,15 +148,43 @@ async def test_agent():
         logger.error(f"Agent test failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Agent test failed: {str(e)}")
 
-@app.post("/graph/generate")
-def graph_generate(req: ItineraryRequest):
-    """Run LangGraph pipeline: itinerary -> accommodations -> combined JSON"""
+
+# New endpoint: generate itinerary and hotels using LangChain agent only
+@app.post("/generate-full-itinerary")
+async def generate_full_itinerary(req: ItineraryRequest):
     try:
+        if not GROQ_API_KEY:
+            raise HTTPException(status_code=500, detail="GROQ API key not configured")
         if not TAVILY_API_KEY:
             raise HTTPException(status_code=500, detail="Tavily API key not configured")
-        return run_graph(req.preference, req.days)
+        if req.days <= 0 or req.days > 30:
+            raise HTTPException(status_code=400, detail="Days must be between 1 and 30")
+        if not req.preference or len(req.preference.strip()) == 0:
+            raise HTTPException(status_code=400, detail="Preference cannot be empty")
+
+        travel_agent = get_travel_agent()
+        result = travel_agent.generate_itinerary(req.preference, req.days)
+        if result.get("success"):
+            # Extract hotels/homestays from itinerary if present
+            hotels_by_location = {}
+            for day in result["itinerary"]:
+                loc = day.get("location", "Unknown")
+                accs = day.get("accommodations", [])
+                hotels_by_location[loc] = accs
+            return {
+                "success": True,
+                "itinerary": result["itinerary"],
+                "hotels": hotels_by_location,
+                "preference": req.preference,
+                "days": req.days,
+                "framework": "LangChain Agent"
+            }
+        else:
+            error_msg = result.get("error", "Unknown error occurred")
+            logger.error(f"Agent failed: {error_msg}")
+            raise HTTPException(status_code=500, detail=f"Agent failed: {error_msg}")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Graph generation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Graph generation failed: {str(e)}")
+        logger.error(f"Error generating itinerary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

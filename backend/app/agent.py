@@ -125,26 +125,35 @@ class TravelAgent:
         # Create tools
         self.tools = [search_sikkim_attractions, generate_detailed_itinerary]
         
-        # Create prompt template
+        # Improved prompt template for richer, valid JSON output
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert travel agent specializing in Sikkim tourism. 
-            Your goal is to create personalized travel itineraries based on user preferences.
-            
-            Available tools:
-            - search_sikkim_attractions: Search for information about Sikkim attractions
-            - generate_detailed_itinerary: Create a detailed itinerary based on preferences and search data
-            
-            Process:
-            1. First, search for relevant attractions based on the user's preference
-            2. Then, generate a detailed itinerary using the search results
-            3. Return the final itinerary in JSON format
-            
-            Always be helpful and provide detailed, accurate information about Sikkim travel."""),
+            ("system", """
+You are an expert travel agent specializing in Sikkim tourism. Your goal is to create personalized, detailed travel itineraries based on user preferences.
+
+Instructions:
+[ 
+    {{
+        "day": 1,
+        "title": "Day 1 - Arrival in Gangtok",
+        "activities": [
+            "9:00 AM - Arrive in Gangtok and check into hotel",
+            "11:00 AM - Visit MG Marg and explore local markets",
+            "2:00 PM - Visit Rumtek Monastery",
+            "6:00 PM - Dinner at local restaurant"
+        ],
+        "location": "Gangtok",
+        "description": "Begin your Sikkim adventure in the capital city.",
+        "accommodations": [
+            {{ "name": "Mayfair Spa Resort & Casino", "url": "https://www.mayfairhotels.com/mayfair-gangtok/" }},
+            {{ "name": "Hotel Sonam Delek", "url": "https://www.sonamdelek.com/" }}
+        ]
+    }}
+]
+"""),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
-        
         # Create agent
         self.agent = create_openai_tools_agent(self.llm, self.tools, self.prompt)
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
@@ -171,31 +180,28 @@ class TravelAgent:
             # Extract the response
             response_content = result.get("output", "")
             
-            # Try to parse JSON from the response
+            # Try to parse JSON from the response, attempt to fix minor issues
+            import re
             try:
-                # Look for JSON in the response
-                start_idx = response_content.find('[')
-                end_idx = response_content.rfind(']') + 1
-                
-                if start_idx != -1 and end_idx != 0:
-                    json_str = response_content[start_idx:end_idx]
-                    itinerary_data = json.loads(json_str)
-                    return {
-                        "success": True,
-                        "itinerary": itinerary_data,
-                        "preference": preference,
-                        "days": days
-                    }
+                # Extract JSON array from response
+                match = re.search(r'(\[.*\])', response_content, re.DOTALL)
+                if match:
+                    json_str = match.group(1)
                 else:
-                    # If no JSON found, return error
-                    return {
-                        "success": False,
-                        "error": "Could not extract valid itinerary from response",
-                        "raw_response": response_content
-                    }
-            
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parsing error: {str(e)}")
+                    json_str = response_content.strip()
+                # Attempt to fix common issues
+                json_str = json_str.replace("\'", '"')
+                # Remove trailing commas
+                json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
+                itinerary_data = json.loads(json_str)
+                return {
+                    "success": True,
+                    "itinerary": itinerary_data,
+                    "preference": preference,
+                    "days": days
+                }
+            except Exception as e:
+                logger.error(f"JSON parsing error: {str(e)} | Raw: {response_content}")
                 return {
                     "success": False,
                     "error": f"Invalid JSON format: {str(e)}",
